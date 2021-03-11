@@ -82,7 +82,7 @@ async function setupDatabase(stores) {
 
 module.exports = async function init(databaseSchema = 'test', getLogger) {
     const options = {
-        db: { ...dbConfig.getDb(), pool: { min: 2, max: 8 } },
+        db: { ...dbConfig.getDb(), pool: { min: 2, max: 20 } },
         databaseSchema,
         getLogger,
     };
@@ -92,7 +92,7 @@ module.exports = async function init(databaseSchema = 'test', getLogger) {
 
     await db.raw(`DROP SCHEMA IF EXISTS ${options.databaseSchema} CASCADE`);
     await db.raw(`CREATE SCHEMA IF NOT EXISTS ${options.databaseSchema}`);
-    await migrator(options);
+    await migrator.up(options);
     await db.destroy();
     const stores = await createStores(options, eventBus);
     stores.clientMetricsStore.setMaxListeners(0);
@@ -100,10 +100,18 @@ module.exports = async function init(databaseSchema = 'test', getLogger) {
     await resetDatabase(stores);
     await setupDatabase(stores);
 
+    const reset = async () => {
+        await db.raw(`DROP SCHEMA IF EXISTS ${options.databaseSchema} CASCADE`);
+        await db.raw(`CREATE SCHEMA IF NOT EXISTS ${options.databaseSchema}`);
+        await migrator.reset(options);
+        await migrator.up(options);
+    };
+
     return {
         stores,
         reset: async () => {
-            await resetDatabase(stores);
+            // await resetDatabase(stores);
+            await reset();
             await setupDatabase(stores);
         },
     };
